@@ -1,0 +1,98 @@
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # Build and test job
+  build_and_test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Test with pytest
+      run: |
+        # Create a simple test to ensure the application runs
+        mkdir -p tests
+        echo 'def test_app_import():\n    from app import app\n    assert app is not None' > tests/test_app.py
+        pytest
+        
+    - name: Create artifact for deployment
+      run: |
+        zip -r app.zip app.py requirements.txt templates/
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: app-artifact
+        path: app.zip
+
+  # Deploy job
+  deploy:
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+      
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: app-artifact
+        
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: 'liaplus-webapp'
+        slot-name: 'production'
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: 'app.zip'
+        
+    - name: Post-deployment health check
+      run: |
+        # Wait for deployment to complete
+        sleep 30
+        # Check health endpoint
+        response=$(curl -s -o /dev/null -w "%{http_code}" https://liaplus-webapp.azurewebsites.net/health)
+        if [ "$response" != "200" ]; then
+          echo "Health check failed with status: $response"
+          exit 1
+        fi
+        echo "Health check successful!"

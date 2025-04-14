@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LiaPlus AI - DevOps Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 40px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LiaPlus AI - DevOps Demo Application</h1>
+        <p>This is a simple Flask application deployed on Azure.</p>
+        <p>This application was deployed using a CI/CD pipeline.</p>
+        <p><small>Current server time: <span id="server-time"></span></small></p>
+    </div>
+
+    <script>
+        // Update the time every second
+        setInterval(() => {
+            document.getElementById('server-time').textContent = new Date().toLocaleString();
+        }, 1000);
+    </script>
+</body>
+</html>
